@@ -437,6 +437,7 @@
 </div>
 
 <script>
+window.addEventListener('DOMContentLoaded', () => {
   const cylinderOrder = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
   const colors = {
     0:'green',1:'red',2:'black',3:'red',4:'black',5:'red',6:'black',
@@ -605,6 +606,7 @@
     }));
   }
 
+  // Numéros chauds
   function hotNumbers() {
     return frequency()
       .filter(item => item.count > 0)
@@ -612,6 +614,7 @@
       .slice(0, 10);
   }
 
+  // Numéros probables
   function probableNumbers() {
     const freq = frequency();
     const recent = history.slice(0, 5);
@@ -627,6 +630,7 @@
       .slice(0, 10);
   }
 
+  // Transversales probables (calcul des scores)
   function streetScores() {
     if (!history.length) return [];
     const freq = frequency();
@@ -640,6 +644,7 @@
       .slice(0, 6);
   }
 
+  // Statistiques d'apparitions ordonnées par position du cylindre
   function cylinderStats() {
     const freq = frequency();
     return cylinderOrder.map((number, index) => ({
@@ -649,6 +654,7 @@
     })).sort((a,b) => b.count - a.count || a.position - b.position).slice(0, 12);
   }
 
+  // Analyse des secteurs physiques
   function sectorStats() {
     const freq = frequency();
     const totalHits = history.length;
@@ -666,6 +672,7 @@
     });
   }
 
+  // Analyse des chances simples
   function chancesStats() {
     const total = history.length;
     if (!total) return [];
