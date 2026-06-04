@@ -343,7 +343,13 @@
         <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
           <h3>Calculateur de Mises</h3>
           
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+          <!-- NOUVEAU : ACTIVATION JEU -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">JEU COMMENCÉ :</span>
+            <button id="btn-toggle-game" style="border: none; border-radius: 8px; padding: 5px 12px; font-size: 0.75rem; font-weight: bold; cursor: pointer; color: white; background: #334155; transition: background 0.15s, color 0.15s;">NON</button>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
             <label style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">CAPITAL SÉANCE :</label>
             <input type="number" id="calc-capital" value="10.00" step="0.10" style="width: 80px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 2px 6px; font-weight: 700; text-align: center;" />
           </div>
@@ -358,7 +364,7 @@
             <strong id="calc-balance" style="font-size: 1rem; color: #79b7ff;">10.00</strong>
           </div>
 
-          <!-- MISE UNITAIRE INITIALE -->
+          <!-- NOUVEAU: MISE UNITAIRE INITIALE -->
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
             <label style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">MISE UNITAIRE :</label>
             <input type="number" id="calc-unit-bet" value="0.10" step="0.01" style="width: 80px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 2px 6px; font-weight: 700; text-align: center;" />
@@ -366,7 +372,11 @@
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
             <span style="color: var(--muted);">Progression (Multiplicateur) :</span>
-            <strong id="calc-progression" style="font-size: 1rem; color: #ffbe32;">1</strong>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong id="calc-progression" style="font-size: 1rem; color: #ffbe32;">1</strong>
+              <!-- NOUVEAU : RAZ MISE -->
+              <button id="btn-reset-progression" style="border: none; border-radius: 6px; padding: 2px 6px; font-size: 0.65rem; font-weight: bold; cursor: pointer; color: white; background: var(--red); transition: opacity 0.15s;">RAZ x1</button>
+            </div>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
@@ -480,6 +490,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let progressionMultiplier = 1;
   let consecutiveLosses = 0;
   let resultsHistory = []; // stockera "G" ou "P"
+  let gameStarted = false; // statut d'activation du jeu de base
 
   const grid = document.getElementById('roulette-grid');
   const historyList = document.getElementById('history-list');
@@ -557,8 +568,8 @@ window.addEventListener('DOMContentLoaded', () => {
   function registerNumber(num) {
     let isWin = false;
     
-    // Si nous avons déjà un historique, on peut évaluer l'issue du coup selon les recommandations
-    if (history.length > 0) {
+    // Si l'historique contient des données ET que le jeu a démarré, on évalue le coup joué
+    if (history.length > 0 && gameStarted) {
       const recommendedStreets = streetScores().map(s => s.name);
       let hitStreetName = "";
       for (const group of streetGroups) {
@@ -569,9 +580,6 @@ window.addEventListener('DOMContentLoaded', () => {
       }
       isWin = recommendedStreets.includes(hitStreetName);
       processBetCalculator(isWin);
-    } else {
-      // Premier coup de la session (pas encore de calcul de mise)
-      resultsHistory = [];
     }
 
     history.unshift(num);
@@ -586,6 +594,7 @@ window.addEventListener('DOMContentLoaded', () => {
     progressionMultiplier = 1;
     consecutiveLosses = 0;
     resultsHistory = [];
+    gameStarted = false;
     render();
   }
 
@@ -606,7 +615,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }));
   }
 
-  // Numéros chauds
   function hotNumbers() {
     return frequency()
       .filter(item => item.count > 0)
@@ -614,7 +622,6 @@ window.addEventListener('DOMContentLoaded', () => {
       .slice(0, 10);
   }
 
-  // Numéros probables
   function probableNumbers() {
     const freq = frequency();
     const recent = history.slice(0, 5);
@@ -814,6 +821,18 @@ window.addEventListener('DOMContentLoaded', () => {
     const calcTotalBet = document.getElementById('calc-total-bet');
     const calcProgression = document.getElementById('calc-progression');
     const calcResultsHistory = document.getElementById('calc-results-history');
+    const btnToggleGame = document.getElementById('btn-toggle-game');
+
+    // Mise à jour de l'état du bouton "Jeu commencé"
+    if (gameStarted) {
+      btnToggleGame.textContent = "OUI";
+      btnToggleGame.style.background = "var(--green)";
+      btnToggleGame.style.color = "#071405";
+    } else {
+      btnToggleGame.textContent = "NON";
+      btnToggleGame.style.background = "#334155";
+      btnToggleGame.style.color = "white";
+    }
 
     const diff = Number((balance - sessionCapital).toFixed(2));
     calcDiff.textContent = (diff >= 0 ? "+" : "") + diff.toFixed(2);
@@ -953,6 +972,21 @@ window.addEventListener('DOMContentLoaded', () => {
       jumpsTable.appendChild(row);
     });
   }
+
+  // Interrupteur ON/OFF du Jeu Commencé
+  const btnToggleGame = document.getElementById('btn-toggle-game');
+  btnToggleGame.addEventListener('click', () => {
+    gameStarted = !gameStarted;
+    render();
+  });
+
+  // Bouton de remise à zéro de la mise (RAZ x1)
+  const btnResetProgression = document.getElementById('btn-reset-progression');
+  btnResetProgression.addEventListener('click', () => {
+    progressionMultiplier = 1;
+    consecutiveLosses = 0;
+    render();
+  });
 
   // Écouteur pour la mise à jour manuelle du capital
   const calcCapitalInput = document.getElementById('calc-capital');
