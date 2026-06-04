@@ -339,39 +339,50 @@
           </table>
         </div>
 
-        <!-- CALCULATEUR DE MISES (Remplace les 6 Transversales) -->
+        <!-- CALCULATEUR DE MISES -->
         <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
           <h3>Calculateur de Mises</h3>
           
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
             <label style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">CAPITAL SÉANCE :</label>
-            <input type="number" id="calc-capital" value="100" style="width: 70px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 2px 6px; font-weight: 700; text-align: center;" />
+            <input type="number" id="calc-capital" value="10.00" step="0.10" style="width: 80px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 2px 6px; font-weight: 700; text-align: center;" />
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
             <span style="color: var(--muted);">Déficit / Surplus :</span>
-            <span id="calc-diff" class="deviation-badge" style="font-weight: 700;">+0</span>
+            <span id="calc-diff" class="deviation-badge" style="font-weight: 700;">+0.00</span>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
             <span style="color: var(--muted);">Balance :</span>
-            <strong id="calc-balance" style="font-size: 1rem; color: #79b7ff;">100</strong>
+            <strong id="calc-balance" style="font-size: 1rem; color: #79b7ff;">10.00</strong>
+          </div>
+
+          <!-- MISE UNITAIRE INITIALE -->
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+            <label style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">MISE UNITAIRE :</label>
+            <input type="number" id="calc-unit-bet" value="0.10" step="0.01" style="width: 80px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 2px 6px; font-weight: 700; text-align: center;" />
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
+            <span style="color: var(--muted);">Progression (Multiplicateur) :</span>
+            <strong id="calc-progression" style="font-size: 1rem; color: #ffbe32;">1</strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
             <span style="color: var(--muted);">Mise / Transversale :</span>
-            <strong id="calc-mise" style="font-size: 1.1rem; color: #ffbe32;">1</strong>
+            <strong id="calc-mise" style="font-size: 1.1rem; color: #ffbe32;">0.10</strong>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
             <span style="color: var(--muted);">Mise Totale (x6) :</span>
-            <strong id="calc-total-bet" style="color: var(--muted);">6</strong>
+            <strong id="calc-total-bet" style="color: var(--muted);">0.60</strong>
           </div>
 
-          <!-- Résultat coup défilant -->
+          <!-- RUBAN DÉFILANT DES RÉSULTATS (Derniers Coups G/P) -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
-            <span style="color: var(--muted);">Résultat coup :</span>
-            <span id="calc-result" class="num-badge" style="background: rgba(255,255,255,0.1); width: 30px; height: 30px; line-height: 30px; font-size: 1rem; text-align: center; border-radius: 50%;">-</span>
+            <span style="color: var(--muted);">Derniers Coups :</span>
+            <div id="calc-results-history" style="display: flex; gap: 4px;"></div>
           </div>
         </div>
 
@@ -461,12 +472,13 @@
   const maxHistory = 50;
   let history = [];
 
-  // Variables d'état du calculateur financier
-  let sessionCapital = 100;
-  let balance = 100;
-  let currentMise = 1;
+  // Variables d'état financières (avec décimales)
+  let sessionCapital = 10.00;
+  let balance = 10.00;
+  let unitBet = 0.10;
+  let progressionMultiplier = 1;
   let consecutiveLosses = 0;
-  let lastResult = "-";
+  let resultsHistory = []; // stockera "G" ou "P"
 
   const grid = document.getElementById('roulette-grid');
   const historyList = document.getElementById('history-list');
@@ -501,32 +513,42 @@
     }
   }
 
-  // Enclenche le calcul financier du coup joué
+  // Calcul financier avec décimales
   function processBetCalculator(isWin) {
+    const currentStreetBet = unitBet * progressionMultiplier;
+    const totalBetThisSpin = currentStreetBet * 6;
+
     if (isWin) {
-      lastResult = "G";
+      resultsHistory.unshift("G");
+      if (resultsHistory.length > 8) resultsHistory.pop(); // Conserve les 8 derniers coups
+
       consecutiveLosses = 0;
-      balance += (12 * currentMise) - (6 * currentMise); // Gain net : +6 * Mise
+      balance += (12 * currentStreetBet) - totalBetThisSpin; // Gain net : +6 * mise transversale
+      balance = Number(balance.toFixed(2)); // Évite les soucis de précision JavaScript
 
       // Descente intelligente : trouver la plus petite mise unitaire m
-      // qui permet de revenir à >= capital_départ au coup gagnant suivant
-      let nextMise = currentMise;
-      for (let m = 1; m <= currentMise; m++) {
-        if (balance + (6 * m) >= sessionCapital) {
-          nextMise = m;
+      // qui permet d'atteindre ou dépasser le capital de départ au coup gagnant suivant
+      let nextMultiplier = progressionMultiplier;
+      for (let m = 1; m <= progressionMultiplier; m++) {
+        const potentialBalance = balance + (6 * unitBet * m);
+        if (potentialBalance >= sessionCapital - 0.0001) {
+          nextMultiplier = m;
           break;
         }
       }
-      currentMise = nextMise;
+      progressionMultiplier = nextMultiplier;
     } else {
-      lastResult = "P";
-      balance -= (6 * currentMise); // Perte nette : -6 * Mise
+      resultsHistory.unshift("P");
+      if (resultsHistory.length > 8) resultsHistory.pop();
+
+      balance -= totalBetThisSpin; // Perte nette : -Mise globale
+      balance = Number(balance.toFixed(2));
       consecutiveLosses++;
       
-      // La montante augmente de +1 après 2 coups perdants consécutifs
+      // La montante augmente de +1 multiplicateur après 2 coups perdants consécutifs
       if (consecutiveLosses >= 2) {
-        currentMise++;
-        consecutiveLosses = 0; // Réinitialise l'attente du palier de 2 coups perdants
+        progressionMultiplier++;
+        consecutiveLosses = 0;
       }
     }
   }
@@ -548,7 +570,7 @@
       processBetCalculator(isWin);
     } else {
       // Premier coup de la session (pas encore de calcul de mise)
-      lastResult = "-";
+      resultsHistory = [];
     }
 
     history.unshift(num);
@@ -558,11 +580,11 @@
 
   function clearHistory() {
     history = [];
-    // Réinitialise la balance au capital
+    // Réinitialise la balance au capital de départ
     balance = sessionCapital;
-    currentMise = 1;
+    progressionMultiplier = 1;
     consecutiveLosses = 0;
-    lastResult = "-";
+    resultsHistory = [];
     render();
   }
 
@@ -583,7 +605,6 @@
     }));
   }
 
-  // Numéros chauds
   function hotNumbers() {
     return frequency()
       .filter(item => item.count > 0)
@@ -591,7 +612,6 @@
       .slice(0, 10);
   }
 
-  // Numéros probables
   function probableNumbers() {
     const freq = frequency();
     const recent = history.slice(0, 5);
@@ -607,7 +627,6 @@
       .slice(0, 10);
   }
 
-  // Transversales probables (calcul des scores)
   function streetScores() {
     if (!history.length) return [];
     const freq = frequency();
@@ -621,7 +640,6 @@
       .slice(0, 6);
   }
 
-  // Statistiques d'apparitions ordonnées par position du cylindre
   function cylinderStats() {
     const freq = frequency();
     return cylinderOrder.map((number, index) => ({
@@ -631,7 +649,6 @@
     })).sort((a,b) => b.count - a.count || a.position - b.position).slice(0, 12);
   }
 
-  // Analyse des secteurs physiques
   function sectorStats() {
     const freq = frequency();
     const totalHits = history.length;
@@ -649,7 +666,6 @@
     });
   }
 
-  // Analyse des chances simples
   function chancesStats() {
     const total = history.length;
     if (!total) return [];
@@ -789,10 +805,11 @@
     const calcBalance = document.getElementById('calc-balance');
     const calcMise = document.getElementById('calc-mise');
     const calcTotalBet = document.getElementById('calc-total-bet');
-    const calcResult = document.getElementById('calc-result');
+    const calcProgression = document.getElementById('calc-progression');
+    const calcResultsHistory = document.getElementById('calc-results-history');
 
-    const diff = balance - sessionCapital;
-    calcDiff.textContent = (diff >= 0 ? "+" : "") + diff;
+    const diff = Number((balance - sessionCapital).toFixed(2));
+    calcDiff.textContent = (diff >= 0 ? "+" : "") + diff.toFixed(2);
     if (diff > 0) {
       calcDiff.className = "deviation-badge positive";
       calcDiff.removeAttribute('style');
@@ -805,22 +822,37 @@
       calcDiff.style.color = "var(--text)";
     }
 
-    calcBalance.textContent = balance;
-    calcMise.textContent = currentMise;
-    calcTotalBet.textContent = currentMise * 6;
+    calcBalance.textContent = balance.toFixed(2);
+    calcProgression.textContent = progressionMultiplier;
+    
+    const streetBet = unitBet * progressionMultiplier;
+    calcMise.textContent = streetBet.toFixed(2);
+    calcTotalBet.textContent = (streetBet * 6).toFixed(2);
 
-    if (lastResult === "G") {
-      calcResult.textContent = "G";
-      calcResult.style.background = "var(--green)";
-      calcResult.style.color = "#071405";
-    } else if (lastResult === "P") {
-      calcResult.textContent = "P";
-      calcResult.style.background = "var(--red)";
-      calcResult.style.color = "white";
-    } else {
-      calcResult.textContent = "-";
-      calcResult.style.background = "rgba(255,255,255,0.1)";
-      calcResult.style.color = "var(--text)";
+    // Rendu du ruban d'historique G/P
+    calcResultsHistory.innerHTML = '';
+    resultsHistory.forEach(res => {
+      const span = document.createElement('span');
+      span.textContent = res;
+      span.className = 'num-badge';
+      span.style.width = '24px';
+      span.style.height = '24px';
+      span.style.lineHeight = '24px';
+      span.style.fontSize = '0.75rem';
+      span.style.borderRadius = '50%';
+      span.style.textAlign = 'center';
+      span.style.boxShadow = 'none';
+      if (res === 'G') {
+        span.style.background = 'var(--green)';
+        span.style.color = '#071405';
+      } else if (res === 'P') {
+        span.style.background = 'var(--red)';
+        span.style.color = 'white';
+      }
+      calcResultsHistory.appendChild(span);
+    });
+    if (resultsHistory.length === 0) {
+      calcResultsHistory.innerHTML = '<span style="color: var(--muted); font-size: 0.8rem; font-style: italic;">Aucun coup</span>';
     }
 
     // Analyse des Secteurs du Cylindre
@@ -915,16 +947,29 @@
     });
   }
 
-  // Détecte la mise à jour manuelle du capital de séance
+  // Écouteur pour la mise à jour manuelle du capital
   const calcCapitalInput = document.getElementById('calc-capital');
   calcCapitalInput.addEventListener('change', (e) => {
-    const val = parseInt(e.target.value);
+    const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
       sessionCapital = val;
       balance = val;
-      currentMise = 1;
+      progressionMultiplier = 1;
       consecutiveLosses = 0;
-      lastResult = "-";
+      resultsHistory = [];
+      render();
+    }
+  });
+
+  // Écouteur pour la mise à jour de la mise unitaire de base
+  const calcUnitBetInput = document.getElementById('calc-unit-bet');
+  calcUnitBetInput.addEventListener('change', (e) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val) && val > 0) {
+      unitBet = val;
+      progressionMultiplier = 1;
+      consecutiveLosses = 0;
+      resultsHistory = [];
       render();
     }
   });
@@ -932,6 +977,7 @@
   clearBtn.addEventListener('click', clearHistory);
   buildBoard();
   render();
+});
 </script>
 </body>
 </html>
