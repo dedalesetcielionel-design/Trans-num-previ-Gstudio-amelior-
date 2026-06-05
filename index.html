@@ -885,4 +885,158 @@
         span.style.color = 'white';
       }
 
-      // Met en vale
+      // Met en valeur le tout dernier coup G/P joué
+      if (index === 0) {
+        span.style.border = '2px solid #ffbe32';
+        span.style.boxShadow = '0 0 6px rgba(255, 190, 50, 0.5)';
+        span.style.transform = 'scale(1.1)';
+      } else {
+        span.style.border = '1px solid rgba(255,255,255,0.15)';
+      }
+      calcResultsHistory.appendChild(span);
+    });
+    if (resultsHistory.length === 0) {
+      calcResultsHistory.innerHTML = '<span style="color: var(--muted); font-size: 0.8rem; font-style: italic; padding: 4px 0;">Aucun coup</span>';
+    }
+
+    // Analyse des Secteurs du Cylindre
+    sectorsTable.innerHTML = '';
+    sectorStats().forEach(sec => {
+      const row = document.createElement('tr');
+      const deviation = parseFloat(sec.dev);
+      const devClass = deviation >= 0 ? 'positive' : 'negative';
+      const devSign = deviation > 0 ? '+' : '';
+      row.innerHTML = `
+        <td><strong>${sec.name}</strong></td>
+        <td class="progress-td">
+          ${sec.pct}%
+          <div class="progress-fill" style="width: ${sec.pct}%"></div>
+        </td>
+        <td><span class="deviation-badge ${devClass}">${devSign}${sec.dev}%</span></td>
+      `;
+      sectorsTable.appendChild(row);
+    });
+
+    // Position Cylindre
+    cylTable.innerHTML = '';
+    cylinderStats().forEach(item => {
+      const row = document.createElement('tr');
+      const badgeClass = colors[item.number];
+      row.innerHTML = `
+        <td><span class="num-badge ${badgeClass}">${item.number}</span></td>
+        <td>Pos ${item.position}</td>
+        <td class="progress-td">
+          ${item.count}
+          <div class="progress-fill" style="width: ${(item.count / maxNumberCount) * 100}%"></div>
+        </td>
+      `;
+      cylTable.appendChild(row);
+    });
+
+    // Chances simples
+    chancesTable.innerHTML = '';
+    chancesStats().forEach(item => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><strong>${item.label}</strong></td>
+        <td>${item.pct1}% / ${item.pct2}%</td>
+        <td class="progress-td" style="font-size: 0.75rem; color: var(--muted);">
+          ${item.val1} vs ${item.val2}
+          <div class="progress-fill" style="width: ${item.pct1}%; border-radius: 4px 0 0 4px;"></div>
+          <div class="progress-fill red-fill" style="left: ${item.pct1}%; width: ${item.pct2}%; border-radius: 0 4px 4px 0;"></div>
+        </td>
+      `;
+      chancesTable.appendChild(row);
+    });
+
+    // Finales Actives
+    finalesTable.innerHTML = '';
+    const topFinales = finalesStats();
+    const maxFinaleCount = topFinales.length ? Math.max(...topFinales.map(f => f.count), 1) : 1;
+    topFinales.forEach(item => {
+      const row = document.createElement('tr');
+      const examples = item.digit === 7 || item.digit === 8 || item.digit === 9 
+        ? `${item.digit}, ${item.digit+10}, ${item.digit+20}` 
+        : `${item.digit}, ${item.digit+10}, ${item.digit+20}, ${item.digit+30}`;
+      row.innerHTML = `
+        <td><strong>Finale ${item.digit}</strong> <span style="font-size: 0.72rem; color: var(--muted);">(${examples})</span></td>
+        <td>${item.count}</td>
+        <td class="progress-td">
+          ${item.pct}%
+          <div class="progress-fill blue-fill" style="width: ${(item.count / maxFinaleCount) * 100}%"></div>
+        </td>
+      `;
+      finalesTable.appendChild(row);
+    });
+
+    // Mouvement Cylindre
+    jumpsTable.innerHTML = '';
+    const js = jumpStats();
+    const jumpsData = [
+      { label: "Zone Proche (0-6)", pct: js.short, desc: "Répétition zone" },
+      { label: "Zone Moyenne (7-12)", pct: js.medium, desc: "Écart moyen" },
+      { label: "Zone Opposée (13-18)", pct: js.long, desc: "Alternance demi-roue" }
+    ];
+    jumpsData.forEach(item => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><strong>${item.label}</strong></td>
+        <td class="progress-td">
+          ${item.pct}%
+          <div class="progress-fill" style="width: ${item.pct}%"></div>
+        </td>
+        <td style="font-size: 0.72rem; color: var(--muted);">${item.desc}</td>
+      `;
+      jumpsTable.appendChild(row);
+    });
+  }
+
+  // Interrupteur ON/OFF du Jeu Commencé
+  const btnToggleGame = document.getElementById('btn-toggle-game');
+  btnToggleGame.addEventListener('click', () => {
+    gameStarted = !gameStarted;
+    render();
+  });
+
+  // Bouton de remise à zéro de la mise (RAZ x1)
+  const btnResetProgression = document.getElementById('btn-reset-progression');
+  btnResetProgression.addEventListener('click', () => {
+    progressionMultiplier = 1;
+    consecutiveLosses = 0;
+    render();
+  });
+
+  // Écouteur pour la mise à jour manuelle du capital
+  const calcCapitalInput = document.getElementById('calc-capital');
+  calcCapitalInput.addEventListener('change', (e) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val) && val > 0) {
+      sessionCapital = val;
+      balance = val;
+      peakBalance = val; // Réinitialise également le sommet de balance
+      progressionMultiplier = 1;
+      consecutiveLosses = 0;
+      resultsHistory = [];
+      render();
+    }
+  });
+
+  // Écouteur pour la mise à jour de la mise unitaire de base
+  const calcUnitBetInput = document.getElementById('calc-unit-bet');
+  calcUnitBetInput.addEventListener('change', (e) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val) && val > 0) {
+      unitBet = val;
+      progressionMultiplier = 1;
+      consecutiveLosses = 0;
+      resultsHistory = [];
+      render();
+    }
+  });
+
+  clearBtn.addEventListener('click', clearHistory);
+  buildBoard();
+  render();
+</script>
+</body>
+</html>
