@@ -311,9 +311,16 @@
         <div class="info-block">Historique max 50 numéros · Analyse en temps réel.</div>
       </div>
 
+      <!-- BANDEAUX D'HISTORIQUES -->
       <div class="card history-container">
         <h3>Derniers numéros (récent à gauche)</h3>
         <div class="history" id="history-list"></div>
+        
+        <!-- NOUVEAU : HISTORIQUE G/P REGROUPÉ ICI POUR UN SCAN VISUEL FACILE -->
+        <div id="gp-history-wrapper" style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+          <h3>Derniers Résultats (G/P)</h3>
+          <div class="history" id="calc-results-history"></div>
+        </div>
       </div>
     </section>
 
@@ -343,7 +350,7 @@
         <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
           <h3>Calculateur de Mises</h3>
           
-          <!-- NOUVEAU : ACTIVATION JEU -->
+          <!-- ACTIVATION JEU -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <span style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">JEU COMMENCÉ :</span>
             <button id="btn-toggle-game" style="border: none; border-radius: 8px; padding: 5px 12px; font-size: 0.75rem; font-weight: bold; cursor: pointer; color: white; background: #334155; transition: background 0.15s, color 0.15s;">NON</button>
@@ -364,7 +371,7 @@
             <strong id="calc-balance" style="font-size: 1rem; color: #79b7ff;">10.00</strong>
           </div>
 
-          <!-- NOUVEAU: MISE UNITAIRE INITIALE -->
+          <!-- MISE UNITAIRE INITIALE -->
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
             <label style="font-size: 0.8rem; color: var(--muted); font-weight: 600;">MISE UNITAIRE :</label>
             <input type="number" id="calc-unit-bet" value="0.10" step="0.01" style="width: 80px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 2px 6px; font-weight: 700; text-align: center;" />
@@ -374,7 +381,7 @@
             <span style="color: var(--muted);">Progression (Multiplicateur) :</span>
             <div style="display: flex; align-items: center; gap: 8px;">
               <strong id="calc-progression" style="font-size: 1rem; color: #ffbe32;">1</strong>
-              <!-- NOUVEAU : RAZ MISE -->
+              <!-- RAZ MISE -->
               <button id="btn-reset-progression" style="border: none; border-radius: 6px; padding: 2px 6px; font-size: 0.65rem; font-weight: bold; cursor: pointer; color: white; background: var(--red); transition: opacity 0.15s;">RAZ x1</button>
             </div>
           </div>
@@ -387,12 +394,6 @@
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
             <span style="color: var(--muted);">Mise Totale (x6) :</span>
             <strong id="calc-total-bet" style="color: var(--muted);">0.60</strong>
-          </div>
-
-          <!-- RUBAN DÉFILANT DES RÉSULTATS (Derniers Coups G/P) -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
-            <span style="color: var(--muted);">Derniers Coups :</span>
-            <div id="calc-results-history" style="display: flex; gap: 4px;"></div>
           </div>
         </div>
 
@@ -486,6 +487,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // Variables d'état financières (avec décimales)
   let sessionCapital = 10.00;
   let balance = 10.00;
+  let peakBalance = 10.00; // Suit la valeur dynamique maximale atteinte par la balance
   let unitBet = 0.10;
   let progressionMultiplier = 1;
   let consecutiveLosses = 0;
@@ -525,7 +527,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Calcul financier avec décimales
+  // Calcul financier avec décimales et sommet dynamique (peakBalance)
   function processBetCalculator(isWin) {
     const currentStreetBet = unitBet * progressionMultiplier;
     const totalBetThisSpin = currentStreetBet * 6;
@@ -538,12 +540,17 @@ window.addEventListener('DOMContentLoaded', () => {
       balance += (12 * currentStreetBet) - totalBetThisSpin; // Gain net : +6 * mise transversale
       balance = Number(balance.toFixed(2)); // Évite les soucis de précision JavaScript
 
+      // Verrouille le nouveau sommet si la balance dépasse la valeur la plus haute connue
+      if (balance > peakBalance) {
+        peakBalance = balance;
+      }
+
       // Descente intelligente : trouver la plus petite mise unitaire m
-      // qui permet d'atteindre ou dépasser le capital de départ au coup gagnant suivant
+      // qui permet d'atteindre ou dépasser le SOMMET de balance (peakBalance) au coup gagnant suivant
       let nextMultiplier = progressionMultiplier;
       for (let m = 1; m <= progressionMultiplier; m++) {
         const potentialBalance = balance + (6 * unitBet * m);
-        if (potentialBalance >= sessionCapital - 0.0001) {
+        if (potentialBalance >= peakBalance - 0.0001) {
           nextMultiplier = m;
           break;
         }
@@ -589,8 +596,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function clearHistory() {
     history = [];
-    // Réinitialise la balance au capital de départ
+    // Réinitialise la balance et le sommet dynamique au capital de départ
     balance = sessionCapital;
+    peakBalance = sessionCapital;
     progressionMultiplier = 1;
     consecutiveLosses = 0;
     resultsHistory = [];
@@ -855,30 +863,20 @@ window.addEventListener('DOMContentLoaded', () => {
     calcMise.textContent = streetBet.toFixed(2);
     calcTotalBet.textContent = (streetBet * 6).toFixed(2);
 
-    // Rendu du ruban d'historique G/P
+    // Rendu du ruban d'historique G/P (Derniers Coups déplacés sous l'historique des numéros)
     calcResultsHistory.innerHTML = '';
-    resultsHistory.forEach(res => {
+    resultsHistory.forEach((res, index) => {
       const span = document.createElement('span');
       span.textContent = res;
-      span.className = 'num-badge';
-      span.style.width = '24px';
-      span.style.height = '24px';
-      span.style.lineHeight = '24px';
-      span.style.fontSize = '0.75rem';
-      span.style.borderRadius = '50%';
-      span.style.textAlign = 'center';
-      span.style.boxShadow = 'none';
       if (res === 'G') {
-        span.style.background = 'var(--green)';
-        span.style.color = '#071405';
+        span.className = 'num-green';
       } else if (res === 'P') {
-        span.style.background = 'var(--red)';
-        span.style.color = 'white';
+        span.className = 'num-red';
       }
       calcResultsHistory.appendChild(span);
     });
     if (resultsHistory.length === 0) {
-      calcResultsHistory.innerHTML = '<span style="color: var(--muted); font-size: 0.8rem; font-style: italic;">Aucun coup</span>';
+      calcResultsHistory.innerHTML = '<span style="color: var(--muted); font-size: 0.85rem; font-style: italic; padding: 6px 0;">Aucun coup enregistré</span>';
     }
 
     // Analyse des Secteurs du Cylindre
@@ -995,6 +993,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!isNaN(val) && val > 0) {
       sessionCapital = val;
       balance = val;
+      peakBalance = val; // Réinitialise également le sommet de balance
       progressionMultiplier = 1;
       consecutiveLosses = 0;
       resultsHistory = [];
