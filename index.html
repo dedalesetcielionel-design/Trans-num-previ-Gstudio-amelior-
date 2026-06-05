@@ -315,6 +315,12 @@
       <div class="card history-container">
         <h3>Derniers numéros (récent à gauche)</h3>
         <div class="history" id="history-list"></div>
+        
+        <!-- HISTORIQUE G/P REGROUPÉ ICI POUR UN SCAN VISUEL FACILE -->
+        <div id="gp-history-wrapper" style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+          <h3>Derniers Résultats (G/P)</h3>
+          <div class="history" id="calc-results-history"></div>
+        </div>
       </div>
     </section>
 
@@ -505,6 +511,7 @@
   const clearBtn = document.getElementById('clear-history');
 
   function buildBoard() {
+    grid.innerHTML = '';
     const zero = document.createElement('button');
     zero.textContent = '0';
     zero.dataset.num = 0;
@@ -862,7 +869,7 @@
     calcMise.textContent = streetBet.toFixed(2);
     calcTotalBet.textContent = (streetBet * 6).toFixed(2);
 
-    // Rendu du ruban d'historique G/P sous son titre indépendant (correctif de structure)
+    // Rendu du ruban d'historique G/P sous son titre indépendant (correctif de structure et style compact)
     calcResultsHistory.innerHTML = '';
     resultsHistory.forEach((res, index) => {
       const span = document.createElement('span');
